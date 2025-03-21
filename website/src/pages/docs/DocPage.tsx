@@ -17,7 +17,7 @@ export const DocPage: React.FC = () => {
     }, [docId]);
 
     return (
-        <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="flex h-screen dark:bg-gray-900">
             <DocSidebar />
             <main className="flex-1 overflow-y-auto">
                 <DocContent content={content} />

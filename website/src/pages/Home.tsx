@@ -16,11 +16,11 @@ export function Home() {
         <Hero />
         <div className="container mx-auto px-4 py-8">
           <div className="mb-12">
-            <div className="flex items-center mb-6">
-              <h2 className="text-2xl font-bold">Explore Agents</h2>
+            <div className="flex items-end mb-6">
+              <h2 className="text-4xl font-bold text-gray-900 dark:text-white">Explore Agents</h2>
               <Link
                 to="/allagents"
-                className="mx-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                className="mx-4 text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors mb-1"
               >
                 View All Agents
               </Link>
@@ -28,7 +28,7 @@ export function Home() {
 
             {/* Trending Agents */}
             <div className="mb-12">
-              <h3 className="text-xl font-semibold mb-4">Trending Agents</h3>
+              <h3 className="text-xl font-semibold mb-4 text-gray-600 dark:text-gray-400">Trending Agents</h3>
               <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-4 gap-6">
                 {trendingAgents.slice(0, 4).map(ai => (
                   <AICard key={ai.address} ai={ai} />
@@ -38,7 +38,7 @@ export function Home() {
 
             {/* Featured Agents */}
             <div className="mb-12">
-              <h3 className="text-xl font-semibold mb-4">Featured Agents</h3>
+              <h3 className="text-xl font-semibold mb-4 text-gray-600 dark:text-gray-400">Featured Agents</h3>
               <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-4 gap-6">
                 {featuredAgents.slice(0, 4).map(ai => (
                   <AICard key={ai.address} ai={ai} />

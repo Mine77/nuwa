@@ -3,6 +3,8 @@ module nuwa_framework::agent_info {
     use std::vector;
     use moveos_std::json;
     use moveos_std::object::{ObjectID};
+    use moveos_std::decimal_value::{DecimalValue};
+    friend nuwa_framework::prompt_input;
 
     #[data_struct]
     struct AgentInfo has copy, drop, store {
@@ -14,6 +16,7 @@ module nuwa_framework::agent_info {
         description: String,
         instructions: String,
         model_provider: String,
+        temperature: DecimalValue,
         status: u8,
     }
 
@@ -26,6 +29,7 @@ module nuwa_framework::agent_info {
         description: String,
         instructions: String,
         model_provider: String,
+        temperature: DecimalValue,
         status: u8,
     ): AgentInfo {
         AgentInfo {
@@ -37,6 +41,7 @@ module nuwa_framework::agent_info {
             description,
             instructions,
             model_provider,
+            temperature,
             status,
         }
     }
@@ -78,6 +83,10 @@ module nuwa_framework::agent_info {
         agent_info.status
     }
 
+    public fun get_temperature(agent_info: &AgentInfo): DecimalValue {
+        agent_info.temperature
+    }
+
     /// The PromptAgentInfo struct is used to display agent information in a prompt
     struct PromptAgentInfo has copy, drop, store {
         name: String,            
@@ -87,7 +96,7 @@ module nuwa_framework::agent_info {
         instructions: String,
     }
 
-    public fun to_prompt(agent_info: &AgentInfo): String {
+    public(friend) fun format_prompt(agent_info: &AgentInfo): String {
         let prompt_agent_info = PromptAgentInfo {
             name: agent_info.name,
             username: agent_info.username,
@@ -99,5 +108,27 @@ module nuwa_framework::agent_info {
         vector::append(&mut prompt, json::to_json(&prompt_agent_info));
         vector::append(&mut prompt, b"\n```");
         string::utf8(prompt)
+    }
+
+    #[test_only]
+    public fun mock_agent_info(): AgentInfo {
+        use moveos_std::tx_context;
+        use moveos_std::object;
+        use moveos_std::decimal_value;
+
+        let obj_id = object::derive_object_id_for_test();
+        let agent_address = tx_context::fresh_address();
+        new_agent_info(
+            obj_id,
+            agent_address,
+            string::utf8(b"Test Agent"),
+            string::utf8(b"test_agent"),
+            string::utf8(b"https://example.com/avatar.png"),
+            string::utf8(b"Test Agent Description"),
+            string::utf8(b"Test Agent Instructions"),
+            string::utf8(b"gpt-4o"),
+            decimal_value::new(7, 1),
+            0,
+        )
     }
 }

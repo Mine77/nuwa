@@ -1,10 +1,12 @@
 module nuwa_framework::agent {
     use std::string::{Self, String};
-    use std::option::{Option};
+    use std::option::{Self, Option};
+    use std::vector;
     use moveos_std::object::{Self, Object, ObjectID};
-    use moveos_std::account::{Self, Account};
+    use moveos_std::account::{Self, AccountCap};
     use moveos_std::signer;
     use moveos_std::timestamp;
+    use moveos_std::decimal_value::{Self, DecimalValue};
 
     use rooch_framework::coin::{Self, Coin};
     use rooch_framework::account_coin_store;
@@ -13,9 +15,10 @@ module nuwa_framework::agent {
     use nuwa_framework::agent_cap::{Self, AgentCap};
     use nuwa_framework::memory::{Self, MemoryStore};
     use nuwa_framework::agent_info;
+    use nuwa_framework::agent_input_info::{AgentInputInfo};
     use nuwa_framework::task_spec::{Self, TaskSpecifications, TaskSpecification};
     use nuwa_framework::config;
-    use nuwa_framework::name_registry;
+    use nuwa_framework::user_profile;
     
     friend nuwa_framework::memory_action;
     friend nuwa_framework::transfer_action;
@@ -23,10 +26,13 @@ module nuwa_framework::agent {
     friend nuwa_framework::agent_runner;
 
     const TASK_SPEC_PROPERTY_NAME: vector<u8> = b"task_specs";
+    const AGENT_CAP_PROPERTY_NAME: vector<u8> = b"agent_cap";
+    const AGENT_INPUT_QUEUE_PROPERTY_NAME: vector<u8> = b"input_queue";
+    const AGENT_PROCESSING_REQUEST_PROPERTY_NAME: vector<u8> = b"processing_request";
 
     const ErrorDeprecatedFunction: u64 = 1;
     const ErrorInvalidInitialFee: u64 = 2;
-    const ErrorUsernameAlreadyRegistered: u64 = 3;
+    const ErrorInvalidAgentCap: u64 = 3;
 
     const AGENT_STATUS_DRAFT: u8 = 0;
     const AGENT_STATUS_ACTIVE: u8 = 1;
@@ -46,26 +52,39 @@ module nuwa_framework::agent {
         description: String,
         /// Instructions for the agent when the agent is running
         instructions: String,
-        // The Agent account, every agent has its own account
-        //TODO design a AccountCap to manage the agent account
-        account: Object<Account>,
+        // The Agent account cap, the agent can control the account
+        account_cap: AccountCap,
         last_active_timestamp: u64,
         memory_store: MemoryStore,
         model_provider: String,
+        temperature: DecimalValue,
         status: u8,
+    }
+
+    /// The input queue of the agent
+    struct AgentInputQueue has key, store {
+        queue: vector<AgentInputInfo>,
+    }
+
+    /// The processing request of the agent
+    struct AgentProcessingRequest has key, store {
+        requests: vector<ObjectID>,
     }
 
     const AI_GPT4O_MODEL: vector<u8> = b"gpt-4o";
 
     public fun create_agent_with_initial_fee(name: String, username: String, avatar: String, description: String, instructions: String, initial_fee: Coin<RGas>) : Object<AgentCap> {
-        assert!(name_registry::is_username_available(&username), ErrorUsernameAlreadyRegistered);
+        
         let initial_fee_amount = coin::value(&initial_fee);
         assert!(initial_fee_amount >= config::get_ai_agent_initial_fee(), ErrorInvalidInitialFee);
-        let agent_account = account::create_account();
-        let agent_signer = account::create_signer_with_account(&mut agent_account);
-        //TODO provide a function to get address from account
+        let account_cap = account::create_account_and_return_cap();
+        let agent_signer = account::create_signer_with_account_cap(&mut account_cap);
         let agent_address = signer::address_of(&agent_signer);
-        name_registry::register_username_internal(agent_address, username);
+        account_coin_store::deposit<RGas>(agent_address, initial_fee);
+
+        // Create a user profile for the agent
+        user_profile::init_profile(&agent_signer, name, username, avatar);
+        
         let agent = Agent {
             agent_address,
             name,
@@ -73,18 +92,21 @@ module nuwa_framework::agent {
             avatar,
             description,
             instructions,
-            account: agent_account,
+            account_cap,
             last_active_timestamp: timestamp::now_milliseconds(),
             memory_store: memory::new_memory_store(),
             model_provider: string::utf8(AI_GPT4O_MODEL),
+            // Default temperature is 0.7
+            temperature: decimal_value::new(7, 1),
             status: AGENT_STATUS_DRAFT,
         };
-        account_coin_store::deposit<RGas>(agent_address, initial_fee);
+        
         // Every account only has one agent
         let agent_obj = object::new_account_named_object(agent_address, agent);
         let agent_obj_id = object::id(&agent_obj);
-        object::to_shared(agent_obj);
         let agent_cap = agent_cap::new_agent_cap(agent_obj_id);
+        set_agent_cap_property(&mut agent_obj, &agent_cap);
+        object::to_shared(agent_obj);
         agent_cap
     } 
 
@@ -109,18 +131,20 @@ module nuwa_framework::agent {
         &agent_ref.memory_store
     }
 
-    public fun get_agent_info(agent: &Object<Agent>): agent_info::AgentInfo {
-        let agent_ref = object::borrow(agent);
+    public fun get_agent_info(agent_obj: &Object<Agent>): agent_info::AgentInfo {
+        let id = object::id(agent_obj);
+        let agent = object::borrow(agent_obj);
         agent_info::new_agent_info(
-            object::id(agent),
-            agent_ref.agent_address,
-            agent_ref.name,
-            agent_ref.username,
-            agent_ref.avatar,
-            agent_ref.description,
-            agent_ref.instructions,
-            agent_ref.model_provider,
-            agent_ref.status,
+            id,
+            agent.agent_address,
+            agent.name,
+            agent.username,
+            agent.avatar,
+            agent.description,
+            agent.instructions,
+            agent.model_provider,
+            agent.temperature,
+            agent.status,
         )
     }
 
@@ -146,9 +170,16 @@ module nuwa_framework::agent {
         &agent_ref.model_provider
     }
 
-    public entry fun destroy_agent_cap(cap: Object<AgentCap>) {
-        //TODO record a variable to show the agent cap is destroyed
+    public fun get_agent_temperature(agent: &Object<Agent>): DecimalValue {
+        let agent_ref = object::borrow(agent);
+        agent_ref.temperature
+    }
+
+    public entry fun destroy_agent_cap(agent_obj: &mut Object<Agent>, cap: Object<AgentCap>) {
+        let agent_obj_id = agent_cap::get_agent_obj_id(&cap);
+        assert!(object::id(agent_obj) == agent_obj_id, ErrorInvalidAgentCap);
         agent_cap::destroy_agent_cap(cap);
+        remove_agent_cap_property(agent_obj);
     }
 
     public fun is_agent_account(addr: address): bool {
@@ -164,7 +195,7 @@ module nuwa_framework::agent {
         let agent_address = agent_ref.agent_address;
         
         // Get the agent's own memories (self-reflections, personal thoughts)
-        memory::get_all_memories(memory_store, agent_address, true)
+        memory::get_all_memories(memory_store, agent_address)
     }
 
     /// Get memories that an agent has about a specific user
@@ -174,19 +205,99 @@ module nuwa_framework::agent {
         let memory_store = &agent_ref.memory_store;
         
         // Get all memories about this specific user
-        memory::get_all_memories(memory_store, user_address, true)
+        memory::get_all_memories(memory_store, user_address)
     }
 
     // ============== Internal functions ==============
 
     public(friend) fun create_agent_signer(agent: &mut Object<Agent>): signer {
         let agent_ref = object::borrow_mut(agent);
-        account::create_signer_with_account(&mut agent_ref.account)
+        account::create_signer_with_account_cap(&mut agent_ref.account_cap)
     }
 
     public(friend) fun update_last_active_timestamp(agent: &mut Object<Agent>) {
         let agent_ref = object::borrow_mut(agent);
         agent_ref.last_active_timestamp = timestamp::now_milliseconds();
+    }
+
+    fun borrow_mut_input_queue(agent: &mut Object<Agent>): &mut AgentInputQueue {
+        if (!object::contains_field(agent, AGENT_INPUT_QUEUE_PROPERTY_NAME)) {
+            object::add_field(agent, AGENT_INPUT_QUEUE_PROPERTY_NAME, AgentInputQueue {
+                queue: vector[]
+            });
+        };
+        object::borrow_mut_field(agent, AGENT_INPUT_QUEUE_PROPERTY_NAME)
+    }
+
+    public(friend) fun append_input(agent: &mut Object<Agent>, input: AgentInputInfo) {
+        let input_queue = borrow_mut_input_queue(agent);
+        vector::push_back(&mut input_queue.queue, input);
+    }
+
+    public fun has_pending_input(agent: &Object<Agent>): bool {
+        if (!object::contains_field(agent, AGENT_INPUT_QUEUE_PROPERTY_NAME)) {
+            false
+        } else {
+            let input_queue : &AgentInputQueue = object::borrow_field(agent, AGENT_INPUT_QUEUE_PROPERTY_NAME);
+            vector::length(&input_queue.queue) > 0
+        }
+    }
+
+    public(friend) fun dequeue_input(agent: &mut Object<Agent>): Option<AgentInputInfo> {
+        let input_queue = borrow_mut_input_queue(agent);
+        if (vector::length(&input_queue.queue) == 0) {
+            option::none()
+        } else {
+            let input = vector::remove(&mut input_queue.queue, 0);
+            option::some(input)
+        }
+    }
+
+    fun borrow_mut_processing_request(agent: &mut Object<Agent>): &mut AgentProcessingRequest {
+        if (!object::contains_field(agent, AGENT_PROCESSING_REQUEST_PROPERTY_NAME)) {
+            object::add_field(agent, AGENT_PROCESSING_REQUEST_PROPERTY_NAME, AgentProcessingRequest {
+                requests: vector[]
+            });
+        };
+        object::borrow_mut_field(agent, AGENT_PROCESSING_REQUEST_PROPERTY_NAME)
+    }
+
+    public(friend) fun add_processing_request(agent: &mut Object<Agent>, request_id: ObjectID) {
+        let processing_request = borrow_mut_processing_request(agent);
+        vector::push_back(&mut processing_request.requests, request_id);
+    }
+
+    public(friend) fun finish_request(agent: &mut Object<Agent>, request_id: ObjectID) {
+        let processing_request = borrow_mut_processing_request(agent);
+        vector::remove_value(&mut processing_request.requests, &request_id);
+    }
+
+    public fun is_processing_request(agent: &Object<Agent>): bool {
+        if (!object::contains_field(agent, AGENT_PROCESSING_REQUEST_PROPERTY_NAME)) {
+            false
+        } else {
+            let processing_request : &AgentProcessingRequest = object::borrow_field(agent, AGENT_PROCESSING_REQUEST_PROPERTY_NAME);
+            vector::length(&processing_request.requests) > 0
+        }
+    }
+
+    fun remove_agent_cap_property(agent: &mut Object<Agent>) {
+        let _cap_id: ObjectID = object::remove_field(agent, AGENT_CAP_PROPERTY_NAME);
+    }
+
+    public(friend) fun set_agent_cap_property(agent: &mut Object<Agent>, cap: &Object<AgentCap>) {
+        assert!(object::id(agent) == agent_cap::get_agent_obj_id(cap), ErrorInvalidAgentCap);
+        let agent_cap_id = object::id(cap);
+        object::upsert_field(agent, AGENT_CAP_PROPERTY_NAME, agent_cap_id);
+    }
+
+    public fun get_agent_cap_id(agent_obj: &Object<Agent>): Option<ObjectID> {
+        if (!object::contains_field(agent_obj, AGENT_CAP_PROPERTY_NAME)) { 
+            option::none()
+        } else {
+            let agent_cap_id = *object::borrow_field(agent_obj, AGENT_CAP_PROPERTY_NAME);
+            option::some(agent_cap_id)
+        }
     }
 
     //================= Public agent update functions ==============
@@ -201,6 +312,20 @@ module nuwa_framework::agent {
         let agent_obj = borrow_mut_agent(agent_obj_id);
         let agent = object::borrow_mut(agent_obj);
         agent.name = new_name;
+        sync_agent_profile(agent_obj);
+    }
+
+    /// Update agent's avatar
+    /// Only allowed for users who possess the AgentCap for this agent
+    public entry fun update_agent_avatar(
+        cap: &mut Object<AgentCap>,
+        new_avatar: String,
+    ) {
+        let agent_obj_id = agent_cap::get_agent_obj_id(cap);
+        let agent_obj = borrow_mut_agent(agent_obj_id);
+        let agent = object::borrow_mut(agent_obj);
+        agent.avatar = new_avatar;
+        sync_agent_profile(agent_obj);
     }
 
     /// Update agent's description
@@ -213,6 +338,19 @@ module nuwa_framework::agent {
         let agent_obj = borrow_mut_agent(agent_obj_id);
         let agent = object::borrow_mut(agent_obj);
         agent.description = new_description;
+    }
+
+    fun sync_agent_profile(agent_obj: &mut Object<Agent>) {
+        let agent_signer = create_agent_signer(agent_obj);
+        let agent = object::borrow(agent_obj);
+        
+        if (!user_profile::exists_profile(agent.agent_address)) {
+            user_profile::init_profile(&agent_signer, agent.name, agent.username, agent.avatar);
+        }else{
+            let profile_obj = user_profile::borrow_mut_profile(&agent_signer);
+            user_profile::update_user_profile_name(profile_obj, agent.name);
+            user_profile::update_user_profile_avatar(profile_obj, agent.avatar);
+        }
     }
 
     /// Update agent's instructions
@@ -313,7 +451,11 @@ module nuwa_framework::agent {
         nuwa_framework::genesis::init_for_test();
         let (agent, agent_cap) = create_default_test_agent();
         assert!(object::is_shared(agent), 1);
-        agent_cap::destroy_agent_cap(agent_cap);
+        assert!(get_agent_cap_id(agent) == option::some(object::id(&agent_cap)), 2);
+        destroy_agent_cap(agent, agent_cap);
+        let agent_cap_id = get_agent_cap_id(agent);
+        std::debug::print(&agent_cap_id);
+        assert!(option::is_none(&agent_cap_id), 3);
     }
 
 }

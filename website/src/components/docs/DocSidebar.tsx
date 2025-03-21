@@ -4,8 +4,6 @@ import { Link, useLocation } from 'react-router-dom';
 const docs = [
     { path: '/docs/intro', title: 'Nuwa Introduction' },
     { path: '/docs/create-agent', title: 'Create Agent' },
-    { path: '/docs/agent-actions', title: 'Agent Actions' },
-    { path: '/docs/agent-tasks', title: 'Agent Tasks' },
     { path: '/docs/security', title: 'Security' },
     { path: '/docs/future-works', title: 'Future Works' },
 ];

@@ -1,14 +1,27 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useMemo, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { Agent } from '../types/agent'
 import { Task, TaskArgument, TaskFormData } from '../types/task'
 import { PencilIcon, ArrowLeftIcon, ClipboardIcon, LockClosedIcon, PlusIcon, TrashIcon, InboxIcon } from '@heroicons/react/24/outline'
 import { mockAgents } from '../mocks/agent'
+import useAgent from '../hooks/use-agent'
+import { formatDate } from '../utils/time'
+import useAgentCaps from '../hooks/use-agent-caps'
 
 export function AgentProfile() {
+  const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [isEditing, setIsEditing] = useState(false)
   const [isEditingPrompt, setIsEditingPrompt] = useState(false)
+
+  const {agent} = useAgent({id: id!})
+  const {caps} = useAgentCaps()
+  const isOwner = useMemo(() => {
+    if (caps.has(agent?.id)) {
+      return true
+    }
+    return false
+  }, [agent, caps])
 
   // Task related states
   const [tasks, setTasks] = useState<Task[]>([])
@@ -26,7 +39,7 @@ export function AgentProfile() {
   const [taskError, setTaskError] = useState<string>('')
 
   // Mock whether user is the agent owner
-  const isOwner = true
+  // const isOwner = true
 
   // Using the first mock agent as an example
   const [agentData, setAgentData] = useState<Partial<Agent>>(mockAgents[0])
@@ -173,8 +186,8 @@ export function AgentProfile() {
             {/* Avatar */}
             <div className="relative -mt-16 mb-4">
               <img
-                src={agentData.avatar}
-                alt={agentData.name}
+                src={agent?.avatar}
+                alt={agent?.username}
                 className="w-32 h-32 rounded-full border-4 border-white dark:border-gray-800 bg-white dark:bg-gray-800"
               />
             </div>
@@ -192,20 +205,22 @@ export function AgentProfile() {
                   />
                 ) : (
                   <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                    {agentData.name}
+                    {agent?.name}
                   </h1>
                 )}
                 <div className="mt-1 text-purple-600 dark:text-purple-400">
-                  @{agentData.agentname}
+                  @{agent?.username}
                 </div>
               </div>
-              <button
+              {
+                isOwner && <button
                 onClick={handleEdit}
                 className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
               >
                 <PencilIcon className="w-4 h-4 mr-2" />
                 {isEditing ? 'Save' : 'Edit'}
               </button>
+              }
             </div>
 
             {/* Description */}
@@ -220,7 +235,7 @@ export function AgentProfile() {
                 />
               ) : (
                 <p className="text-gray-600 dark:text-gray-300">
-                  {agentData.description}
+                  {agent?.description}
                 </p>
               )}
             </div>
@@ -242,7 +257,7 @@ export function AgentProfile() {
                 </h3>
                 <div className="flex items-center group">
                   <code className="text-sm text-gray-900 dark:text-gray-100 font-mono bg-gray-50 dark:bg-gray-800/50 p-2 rounded flex-1">
-                    @task_helper
+                    {agent?.username}
                   </code>
                 </div>
               </div>
@@ -254,7 +269,7 @@ export function AgentProfile() {
                 </h3>
                 <div className="flex items-center group">
                   <code className="text-sm text-gray-900 dark:text-gray-100 font-mono bg-gray-50 dark:bg-gray-800/50 p-2 rounded flex-1 break-all">
-                    0xb9e4b3c592dabbaf70dbc2e2cad66ebce0a91c2c864c99a8fa801863797893db
+                    {agent?.id}
                   </code>
                   <button
                     onClick={() => handleCopy("0xb9e4b3c592dabbaf70dbc2e2cad66ebce0a91c2c864c99a8fa801863797893db")}
@@ -273,7 +288,7 @@ export function AgentProfile() {
                 </h3>
                 <div className="flex items-center group">
                   <code className="text-sm text-gray-900 dark:text-gray-100 font-mono bg-gray-50 dark:bg-gray-800/50 p-2 rounded flex-1 break-all">
-                    rooch19n5zuqjc7rlcx6zgh3ln5fyateczs8n4des4v28y7gkrt7545a9qppy0rl
+                    {agent?.agent_address}
                   </code>
                   <button
                     onClick={() => handleCopy("rooch19n5zuqjc7rlcx6zgh3ln5fyateczs8n4des4v28y7gkrt7545a9qppy0rl")}
@@ -286,7 +301,7 @@ export function AgentProfile() {
               </div>
 
               {/* Character ID */}
-              <div>
+              {/* <div>
                 <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
                   Character ID
                 </h3>
@@ -302,7 +317,7 @@ export function AgentProfile() {
                     <ClipboardIcon className="w-5 h-5" />
                   </button>
                 </div>
-              </div>
+              </div> */}
 
               {/* Other Info Grid */}
               <div className="grid grid-cols-2 gap-6">
@@ -311,7 +326,7 @@ export function AgentProfile() {
                     Model Provider
                   </h3>
                   <p className="text-sm text-gray-900 dark:text-gray-100">
-                    gpt-4o
+                    {agent?.model_provider}
                   </p>
                 </div>
 
@@ -320,7 +335,7 @@ export function AgentProfile() {
                     Last Active
                   </h3>
                   <p className="text-sm text-gray-900 dark:text-gray-100">
-                    3/14/2025, 12:53:49 AM
+                    {formatDate(agent?.last_active_timestamp)}
                   </p>
                 </div>
               </div>
@@ -362,7 +377,7 @@ export function AgentProfile() {
                 />
               ) : (
                 <pre className="whitespace-pre-wrap text-gray-600 dark:text-gray-300 font-mono text-sm leading-relaxed bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg">
-                  {agentData.prompt}
+                  {agent?.instructions}
                 </pre>
               )}
             </div>

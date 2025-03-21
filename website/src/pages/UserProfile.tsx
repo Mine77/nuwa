@@ -4,24 +4,24 @@ import { useState, useRef, useEffect } from 'react'
 import { User } from '../types/user'
 import { mockUser } from '../mocks/user'
 import { useNavigate } from 'react-router-dom'
+import useRgasBalance from "../hooks/use-rgas-balance.tsx";
+import {useCurrentAddress} from "@roochnetwork/rooch-sdk-kit";
+import useAllBalance from "../hooks/use-all-balance.tsx";
+import {normalizeCoinIconUrl} from "../utils/icon.ts";
 
 export function UserProfile() {
-  const { username } = useParams<{ username: string }>()
   const navigate = useNavigate()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const {rGas} = useRgasBalance()
+  const {balance} = useAllBalance()
+  const address = useCurrentAddress()
 
   // Use unified mock data
   const [user, setUser] = useState<User>({
     ...mockUser,
-    username: username || mockUser.username,
+    // If there's an address parameter in URL, use it
     name: mockUser.name
   })
-
-  useEffect(() => {
-    if (username) {
-      setUser(prev => ({ ...prev, username }))
-    }
-  }, [username])
 
   const [isEditingName, setIsEditingName] = useState(false)
   const [editForm, setEditForm] = useState({
@@ -78,6 +78,14 @@ export function UserProfile() {
       reader.readAsDataURL(file)
     }
   }
+
+  useEffect(() => {
+    setUser({
+      ...mockUser,
+      rgasBalance: rGas?.fixedBalance || 0,
+      address: address?.toStr() || ''
+    })
+  }, [rGas, address]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -213,14 +221,14 @@ export function UserProfile() {
                 </button>
               </div>
               <div className="space-y-4">
-                {user.tokens.map((token) => (
+                {balance?.data.map((token) => (
                   <div
-                    key={token.id}
+                    key={token.coin_type}
                     className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm"
                   >
                     <div className="flex items-center space-x-3">
                       <img
-                        src={token.logo}
+                        src={token.icon_url ? normalizeCoinIconUrl(token.icon_url) : ''}
                         alt={token.name}
                         className="w-8 h-8 rounded-full"
                       />
@@ -236,10 +244,7 @@ export function UserProfile() {
                     <div className="flex items-center space-x-4">
                       <div className="text-right">
                         <p className="font-medium text-gray-900 dark:text-gray-100">
-                          {token.balance.toLocaleString(undefined, {
-                            minimumFractionDigits: token.decimals,
-                            maximumFractionDigits: token.decimals
-                          })}
+                          {token.fixedBalance}
                         </p>
                         <p className="text-sm text-gray-500 dark:text-gray-400">
                           {token.symbol}

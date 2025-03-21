@@ -39,7 +39,7 @@ module nuwa_framework::channel_tests {
         assert!(channel::is_member(channel, signer::address_of(&user)), 1);
 
         channel::delete_channel_for_testing(channel_id);
-        agent::destroy_agent_cap(cap);
+        agent::destroy_agent_cap(agent, cap);
     }
 
     #[test]
@@ -58,7 +58,7 @@ module nuwa_framework::channel_tests {
         assert!(channel::is_member(channel, ai_address), 1);
 
         channel::delete_channel_for_testing(channel_id);
-        agent::destroy_agent_cap(cap);
+        agent::destroy_agent_cap(agent, cap);
     }
 
     #[test]
@@ -77,7 +77,7 @@ module nuwa_framework::channel_tests {
         let channel = object::borrow_mut_object_shared(channel_id);
         let msg_content = string::utf8(b"Hello AI!");
         let mentions = vector::empty();
-        let (_, _) = channel::send_message(&user, channel, msg_content, mentions, 0);
+        let (_, _) = channel::send_message_for_test(&user, channel, msg_content, mentions, 0);
         
         // Verify message
         let channel = object::borrow_object(channel_id);
@@ -92,7 +92,7 @@ module nuwa_framework::channel_tests {
         assert!(message::get_type(msg) == message::type_normal(), 3);
 
         channel::delete_channel_for_testing(channel_id);
-        agent::destroy_agent_cap(cap);
+        agent::destroy_agent_cap(agent, cap);
     }
 
     #[test]
@@ -112,10 +112,10 @@ module nuwa_framework::channel_tests {
         let channel = object::borrow_mut_object_shared(channel_id);
         
         let mentions = vector::empty();
-        let (_, _) = channel::send_message(&user2, channel, string::utf8(b"Unauthorized message"), mentions, 0);
+        let (_, _) = channel::send_message_for_test(&user2, channel, string::utf8(b"Unauthorized message"), mentions, 0);
 
         channel::delete_channel_for_testing(channel_id);
-        agent::destroy_agent_cap(cap);
+        agent::destroy_agent_cap(agent, cap);
     }
 
     #[test]
@@ -134,7 +134,7 @@ module nuwa_framework::channel_tests {
         let i = 0;
         let mentions = vector::empty();
         while (i < 5) {
-            let (_, _) = channel::send_message(&user, channel, string::utf8(b"Message"), mentions, 0);
+            let (_, _) = channel::send_message_for_test(&user, channel, string::utf8(b"Message"), mentions, 0);
             i = i + 1;
         };
         
@@ -148,7 +148,7 @@ module nuwa_framework::channel_tests {
         assert!(vector::length(&messages) == 3, 1);
 
         channel::delete_channel_for_testing(channel_id);
-        agent::destroy_agent_cap(cap);
+        agent::destroy_agent_cap(agent, cap);
     }
 
     #[test]
@@ -169,6 +169,6 @@ module nuwa_framework::channel_tests {
         assert!(last_active == 1000, 1);
 
         channel::delete_channel_for_testing(channel_id);
-        agent::destroy_agent_cap(cap);
+        agent::destroy_agent_cap(agent, cap);
     }
 }

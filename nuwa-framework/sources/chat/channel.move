@@ -11,11 +11,13 @@ module nuwa_framework::channel {
     use moveos_std::signer;
     use nuwa_framework::message;
     use nuwa_framework::agent::{Self, Agent};
+    use nuwa_framework::attachment::{Attachment};
 
     friend nuwa_framework::response_action;
     friend nuwa_framework::task_entry;
     friend nuwa_framework::channel_entry;
-
+    friend nuwa_framework::agent_runner;
+    
     // Error codes
     const ErrorChannelNotFound: u64 = 1;
     const ErrorChannelAlreadyExists: u64 = 2;
@@ -43,6 +45,12 @@ module nuwa_framework::channel {
     // Public functions to expose channel types
     public fun channel_type_ai_home(): u8 { CHANNEL_TYPE_AI_HOME }
     public fun channel_type_ai_peer(): u8 { CHANNEL_TYPE_AI_PEER }
+    public fun channel_type_topic(): u8 { CHANNEL_TYPE_TOPIC }
+
+    const CHANNEL_JOIN_POLICY_PUBLIC: u8 = 0;
+    public fun channel_join_policy_public(): u8 { CHANNEL_JOIN_POLICY_PUBLIC }
+    const CHANNEL_JOIN_POLICY_INVITE: u8 = 1;
+    public fun channel_join_policy_invite(): u8 { CHANNEL_JOIN_POLICY_INVITE }
 
     /// Member structure to store member information
     struct Member has store, drop {
@@ -73,6 +81,8 @@ module nuwa_framework::channel {
         status: u8,
         /// Channel type
         channel_type: u8, 
+        /// Channel join policy
+        join_policy: u8,
     }
 
     /// Initialize a new AI home channel
@@ -101,6 +111,7 @@ module nuwa_framework::channel {
             last_active: now,
             status: CHANNEL_STATUS_ACTIVE,
             channel_type: CHANNEL_TYPE_AI_HOME,
+            join_policy: CHANNEL_JOIN_POLICY_PUBLIC,
         };
 
         // Add AI as member
@@ -136,6 +147,7 @@ module nuwa_framework::channel {
             last_active: now,
             status: CHANNEL_STATUS_ACTIVE,
             channel_type: CHANNEL_TYPE_AI_PEER,
+            join_policy: CHANNEL_JOIN_POLICY_INVITE,
         };
 
         // Add both user and AI as members
@@ -169,6 +181,7 @@ module nuwa_framework::channel {
         agent: &mut Object<Agent>,
         parent_channel_obj: &mut Object<Channel>,
         topic: String,
+        join_policy: u8,
     ): ObjectID {
         //TODO validate topic
         let agent_address = agent::get_agent_address(agent);
@@ -192,6 +205,7 @@ module nuwa_framework::channel {
             last_active: now,
             status: CHANNEL_STATUS_ACTIVE,
             channel_type: CHANNEL_TYPE_TOPIC,
+            join_policy: join_policy,
         };
         
         add_member_internal(&mut channel, user_address, now);
@@ -227,30 +241,32 @@ module nuwa_framework::channel {
     }
 
     /// Add message to channel - use message_counter as id
-    fun add_message(channel_obj: &mut Object<Channel>, sender: address, content: String, message_type: u8, mentions: vector<address>, reply_to: u64):(ObjectID, u64) {
+    fun add_message(channel_obj: &mut Object<Channel>, sender: address, content: String, message_type: u8, mentions: vector<address>, reply_to: u64, attachments: vector<Attachment>):(ObjectID, u64) {
         let channel_id = object::id(channel_obj);
         let channel = object::borrow_mut(channel_obj);
         let index = channel.message_counter;
-        let msg_id = message::new_message_object(
+        let msg_id = message::new_message_object_with_attachment(
             index,
             channel_id,
             sender,
             content,
             message_type,
             mentions,
-            reply_to
+            reply_to,
+            attachments
         );
         table::add(&mut channel.messages, index, msg_id);
         channel.message_counter = channel.message_counter + 1;
         (msg_id, index)
     }
 
-    public fun send_message(
+    public(friend) fun send_message(
         account: &signer,
         channel_obj: &mut Object<Channel>,
         content: String,
         mentions: vector<address>,
-        reply_to: u64
+        reply_to: u64,
+        attachments: vector<Attachment>
     ):(ObjectID, u64) {
         vector::for_each(mentions, |addr| {
             assert!(is_channel_member(channel_obj, addr), ErrorMentionedUserNotMember);
@@ -263,8 +279,14 @@ module nuwa_framework::channel {
             assert!(table::contains(&channel.messages, reply_to), ErrorInvalidReplyTo);
         };
 
-        // Check if sender is a member
-        assert!(table::contains(&channel.members, sender), ErrorNotMember);
+        if (!table::contains(&channel.members, sender)) {
+            // If sender is not a member, check the join policy, and add them as a member if the policy is public
+            if (channel.join_policy == CHANNEL_JOIN_POLICY_PUBLIC) {
+                add_member_internal(channel, sender, now);
+            } else {
+                abort ErrorNotMember
+            };
+        };
         assert!(channel.status == CHANNEL_STATUS_ACTIVE, ErrorChannelInactive);
         
         // Update member's last active time
@@ -272,7 +294,7 @@ module nuwa_framework::channel {
         member.last_active = now;
         channel.last_active = now;
 
-        add_message(channel_obj, sender, content, message::type_normal(), mentions, reply_to)
+        add_message(channel_obj, sender, content, message::type_normal(), mentions, reply_to, attachments)
     }
 
     /// Add AI response to the channel
@@ -282,7 +304,7 @@ module nuwa_framework::channel {
         ai_agent_address: address,
         reply_to: u64
     ):(ObjectID, u64) {
-        add_message(channel_obj, ai_agent_address, response_message, message::type_normal(), vector::empty(), reply_to)
+        add_message(channel_obj, ai_agent_address, response_message, message::type_normal(), vector::empty(), reply_to, vector::empty())
     }
 
     public(friend) fun add_ai_event(
@@ -290,7 +312,7 @@ module nuwa_framework::channel {
         event: String, 
         ai_agent_address: address
     ){
-        add_message(channel_obj, ai_agent_address, event, message::type_action_event(), vector::empty(), 0);
+        add_message(channel_obj, ai_agent_address, event, message::type_action_event(), vector::empty(), 0, vector::empty());
     }
 
     /// Get all message ids in the channel
@@ -481,6 +503,7 @@ module nuwa_framework::channel {
             last_active: _,
             status: _,
             channel_type: _,
+            join_policy: _,
         } = object::remove(channel);
         
         table::drop(members);
@@ -493,6 +516,17 @@ module nuwa_framework::channel {
     public fun delete_channel_for_testing(channel_id: ObjectID) {
         let channel = object::take_object_extend<Channel>(channel_id);
         force_delete_channel(channel);
+    }
+
+    #[test_only]
+    public fun send_message_for_test(
+        account: &signer,
+        channel_obj: &mut Object<Channel>,
+        content: String,
+        mentions: vector<address>,
+        reply_to: u64,
+    ): (ObjectID, u64) {
+        send_message(account, channel_obj, content, mentions, reply_to, vector::empty())
     }
 
 }

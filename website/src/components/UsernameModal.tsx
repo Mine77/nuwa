@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 
 interface UsernameModalProps {
     isOpen: boolean
@@ -13,7 +14,7 @@ export function UsernameModal({ isOpen, onClose, onSubmit }: UsernameModalProps)
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
         if (!username.trim()) {
-            setError('用户名不能为空')
+            setError('Username can not be empty')
             return
         }
         setError('')
@@ -28,13 +29,19 @@ export function UsernameModal({ isOpen, onClose, onSubmit }: UsernameModalProps)
         }
     }
 
+    const handleBackdropClick = (e: React.MouseEvent) => {
+        if (e.target === e.currentTarget) {
+            onClose()
+        }
+    }
+
     if (!isOpen) return null
 
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    return createPortal(
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]" onClick={handleBackdropClick}>
             <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-96">
                 <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">
-                    设置用户名
+                    Set Username
                 </h2>
                 <form onSubmit={handleSubmit}>
                     <div className="mb-4">
@@ -42,7 +49,7 @@ export function UsernameModal({ isOpen, onClose, onSubmit }: UsernameModalProps)
                             type="text"
                             value={username}
                             onChange={handleInputChange}
-                            placeholder="请输入用户名"
+                            placeholder="Please enter your username"
                             className={`w-full px-4 py-2 rounded-lg border ${error ? 'border-red-500' : 'border-gray-200 dark:border-gray-700'} bg-gray-50 dark:bg-gray-900 focus:outline-none focus:ring-2 ${error ? 'focus:ring-red-500' : 'focus:ring-purple-500'}`}
                             required
                         />
@@ -58,11 +65,12 @@ export function UsernameModal({ isOpen, onClose, onSubmit }: UsernameModalProps)
                             className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             disabled={!username.trim()}
                         >
-                            确认
+                            Confirm
                         </button>
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     )
 } 

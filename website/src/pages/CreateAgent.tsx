@@ -1,6 +1,9 @@
 import React, { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PhotoIcon } from '@heroicons/react/24/outline'
+import { useCreateAgent } from '../hooks/use-agent-create'
+import { SessionKeyGuard } from '@roochnetwork/rooch-sdk-kit'
+import toast from 'react-hot-toast'
 
 interface CreateAgentForm {
     agentname: string
@@ -17,13 +20,14 @@ export function CreateAgent() {
     const [form, setForm] = useState<CreateAgentForm>({
         agentname: '',
         name: '',
-        avatar: null,
+        avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=default',
         description: '',
         prompt: '',
         isPaid: false
     })
+    const {mutate, isPending} = useCreateAgent()
     const [errors, setErrors] = useState<Partial<CreateAgentForm>>({})
-    const [previewAvatar, setPreviewAvatar] = useState<string | null>(null)
+    const [previewAvatar, setPreviewAvatar] = useState<string | null>('https://api.dicebear.com/7.x/bottts/svg?seed=default')
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value, type, checked } = e.target as HTMLInputElement
@@ -41,20 +45,39 @@ export function CreateAgent() {
     }
 
     const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0]
-        if (file) {
-            const reader = new FileReader()
-            reader.onloadend = () => {
-                const result = reader.result as string
-                setPreviewAvatar(result)
-                setForm(prev => ({
-                    ...prev,
-                    avatar: result
-                }))
-            }
-            reader.readAsDataURL(file)
+        const file = event.target.files?.[0];
+        if (!file) return;
+    
+        const validImageTypes = ["image/png", "image/jpeg", "image/svg+xml"];
+        if (!validImageTypes.includes(file.type)) {
+            alert("Invalid file type. Please upload a PNG, JPEG, or SVG file.");
+            return;
         }
-    }
+    
+        const reader = new FileReader();
+    
+        if (file.type === "image/svg+xml") {
+            reader.onload = () => {
+                const svgContent = reader.result as string;
+                setPreviewAvatar(`data:image/svg+xml;utf8,${encodeURIComponent(svgContent || '')}`); 
+                setForm((prev) => ({
+                    ...prev,
+                    avatar: svgContent, 
+                }));
+            };
+            reader.readAsText(file); 
+        } else {
+            reader.onload = () => {
+                const base64Image = reader.result as string;
+                setPreviewAvatar(base64Image); 
+                setForm((prev) => ({
+                    ...prev,
+                    avatar: base64Image, 
+                }));
+            };
+            reader.readAsDataURL(file); 
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -73,11 +96,20 @@ export function CreateAgent() {
             return
         }
 
-        // TODO: Submit form to backend
-        console.log('Form submitted:', form)
-
-        // Navigate back after successful submission
-        navigate(-1)
+        mutate({
+            name: form.name,
+            username: form.agentname,  
+            avatar: form.avatar!,
+            description: form.description,
+            instructions: form.prompt
+        }, {
+            onSuccess: () => {
+                navigate(-1)
+            },
+            onError: (error) => {
+                toast.error(error.message)
+            }
+        })
     }
 
     return (
@@ -125,12 +157,12 @@ export function CreateAgent() {
                             )}
                         </div>
 
-                        {/* Avatar */}
-                        <div className="mb-6">
+                                                <div className="mb-6">
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Avatar
                             </label>
-                            <div className="mt-1 flex items-center space-x-4">
+                            <div className="flex items-center space-x-4">
+                                {/* Upload Button */}
                                 <button
                                     type="button"
                                     onClick={() => fileInputRef.current?.click()}
@@ -153,9 +185,28 @@ export function CreateAgent() {
                                     onChange={handleAvatarChange}
                                     className="hidden"
                                 />
-                                <span className="text-sm text-gray-500 dark:text-gray-400">
-                                    Click to upload avatar
-                                </span>
+                        
+                                {/* URL Input */}
+                                <div className="flex-1">
+                                    <label htmlFor="avatarUrl" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        Or enter a URL
+                                    </label>
+                                    <input
+                                        type="url"
+                                        id="avatarUrl"
+                                        name="avatarUrl"
+                                        placeholder="https://example.com/avatar.png"
+                                        className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                        onChange={(e) => {
+                                            const url = e.target.value.trim()
+                                            setPreviewAvatar(url)
+                                            setForm(prev => ({
+                                                ...prev,
+                                                avatar: url
+                                            }))
+                                        }}
+                                    />
+                                </div>
                             </div>
                         </div>
 
@@ -217,12 +268,42 @@ export function CreateAgent() {
                             >
                                 Cancel
                             </button>
-                            <button
-                                type="submit"
-                                className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-                            >
-                                Create
-                            </button>
+                            <SessionKeyGuard onClick={() => {}}>
+    <button
+        type="submit"
+        disabled={isPending} // Disable button when loading
+        className={`px-4 py-2 text-sm font-medium text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+            isPending
+                ? "bg-purple-400 cursor-not-allowed"
+                : "bg-purple-600 hover:bg-purple-700 focus:ring-purple-500"
+        }`}
+    >
+        {isPending ? (
+            <svg
+                className="w-5 h-5 animate-spin mx-auto text-white" // Center spinner
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+            >
+                <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                ></circle>
+                <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8v8H4z"
+                ></path>
+            </svg>
+        ) : (
+            "Create"
+        )}
+    </button>
+                            </SessionKeyGuard>
                         </div>
                     </div>
                 </form>

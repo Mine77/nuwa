@@ -3,6 +3,7 @@ module nuwa_framework::agent_tests {
     use std::debug;
     use std::string;
     use std::vector;
+    use moveos_std::signer;
     use rooch_framework::gas_coin::RGas;
     use nuwa_framework::agent;
     use nuwa_framework::agent_runner;
@@ -10,8 +11,11 @@ module nuwa_framework::agent_tests {
     use nuwa_framework::channel;
     use nuwa_framework::message;
     use nuwa_framework::agent_input_info;
-    use nuwa_framework::task_spec;
     use nuwa_framework::message_for_agent;
+    use nuwa_framework::prompt_input;
+    use nuwa_framework::user_profile;
+    use nuwa_framework::test_helper;
+    
     #[test]
     fun test_prompt_builder() {
         nuwa_framework::genesis::init_for_test();
@@ -27,7 +31,11 @@ module nuwa_framework::agent_tests {
         // Create AI home channel
         let channel_id = channel::create_ai_home_channel(agent);
        
-        let test_user = @0x43;
+        let test_user_signer = test_helper::create_test_account();
+        let test_user = signer::address_of(&test_user_signer);
+
+        user_profile::init_profile(&test_user_signer, string::utf8(b"TestUser"), string::utf8(b"testuser"), string::utf8(b"https://test/avator.png"));
+
 
         // First interaction: User introduces themselves
         let test_message = message::new_message_for_test(
@@ -47,16 +55,15 @@ module nuwa_framework::agent_tests {
         
         let agent_input_info = agent_input::into_agent_input_info(agent_input, coin_input);
         
-        let app_task_specs = task_spec::empty_task_specifications();
         // Get first prompt
-        let prompt = agent_runner::generate_system_prompt(agent, agent_input_info, app_task_specs);
-
+        let prompt_input = agent_runner::generate_system_prompt(agent, agent_input_info);
+        let prompt = prompt_input::format_prompt(&prompt_input);
         // Print first prompt for debugging
         debug::print(&string::utf8(b"First Prompt:"));
         debug::print(string::bytes(&prompt));
 
         // Clean up
         channel::delete_channel_for_testing(channel_id);
-        agent::destroy_agent_cap(cap);
+        agent::destroy_agent_cap(agent, cap);
     }
 }
