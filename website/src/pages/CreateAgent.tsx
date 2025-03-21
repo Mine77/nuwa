@@ -20,14 +20,14 @@ export function CreateAgent() {
     const [form, setForm] = useState<CreateAgentForm>({
         agentname: '',
         name: '',
-        avatar: '',
+        avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=default',
         description: '',
         prompt: '',
         isPaid: false
     })
     const {mutate, isPending} = useCreateAgent()
     const [errors, setErrors] = useState<Partial<CreateAgentForm>>({})
-    const [previewAvatar, setPreviewAvatar] = useState<string | null>(null)
+    const [previewAvatar, setPreviewAvatar] = useState<string | null>('https://api.dicebear.com/7.x/bottts/svg?seed=default')
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value, type, checked } = e.target as HTMLInputElement

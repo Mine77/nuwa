@@ -1,6 +1,14 @@
 export function CreateAISection() {
   return (
-    <div className="bg-[url('/createai-background.png')] bg-cover bg-center bg-no-repeat py-16 sm:py-24">
+    <div 
+      className="bg-gradient-to-b from-white to-purple-50 dark:from-gray-900 dark:to-gray-800 py-16 sm:py-24"
+      style={{
+        backgroundImage: `url('/createai-background.png')`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }}
+    >
       <div className="container mx-auto px-4">
         <div className="flex flex-col md:flex-row items-center justify-between gap-8 md:gap-12">
           {/* Empty div to maintain layout */}
@@ -16,7 +24,7 @@ export function CreateAISection() {
               Share your AI's capabilities with the world and connect with other creators.
             </p>
             <button
-              className="inline-flex items-center px-6 py-3 rounded-full text-white bg-purple-600 hover:bg-purple-700 transition-colors duration-200 font-medium text-lg"
+              className="inline-flex items-center px-6 py-3 rounded-full text-white bg-purple-600 hover:bg-purple-700 dark:bg-purple-500 dark:hover:bg-purple-600 transition-colors duration-200 font-medium text-lg"
               onClick={() => {
                 // TODO: Implement create AI functionality
                 console.log('Create AI clicked')

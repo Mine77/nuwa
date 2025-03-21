@@ -1,4 +1,6 @@
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, useLocation, Link } from 'react-router-dom'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { Theme } from '@radix-ui/themes'
 import { Toaster } from 'react-hot-toast'
 import { Sidebar } from './components/Sidebar'
 import { Home } from './pages/Home'
@@ -16,6 +18,8 @@ import { ThemeToggle } from './components/ThemeToggle'
 
 function AppContent() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+  const [user, setUser] = useState<User | null>(null)
+  const [isDarkMode, setIsDarkMode] = useState(false)
   const location = useLocation()
 
   // Check if sidebar should be collapsed when route changes
@@ -23,6 +27,35 @@ function AppContent() {
     const shouldCollapse = location.pathname.startsWith('/agent/') || location.pathname.startsWith('/docs/')
     setIsSidebarCollapsed(shouldCollapse)
   }, [location.pathname])
+
+  // Check dark mode
+  useEffect(() => {
+    const isDark = document.documentElement.classList.contains('dark')
+    setIsDarkMode(isDark)
+  }, [])
+
+  // Listen for dark mode changes
+  useEffect(() => {
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.attributeName === 'class') {
+          setIsDarkMode(document.documentElement.classList.contains('dark'))
+        }
+      })
+    })
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    })
+
+    return () => observer.disconnect()
+  }, [])
+
+  const handleConnectWallet = () => {
+    // TODO: Implement wallet connection
+    console.log('Connect wallet clicked')
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">

@@ -1,12 +1,12 @@
-import {useState, useRef, useEffect} from 'react'
-import {Link, useNavigate} from 'react-router-dom'
-import {Logo} from './Logo'
-import {MagnifyingGlassIcon, Cog6ToothIcon, ArrowRightOnRectangleIcon} from '@heroicons/react/24/outline'
-import {User} from '../types/user'
-import {ConnectButton, useConnectionStatus, useCurrentAddress, useSubscribeOnRequest} from "@roochnetwork/rooch-sdk-kit";
-import {mockUser} from "../mocks/user.ts";
-import useRgasBalance from "../hooks/use-rgas-balance.tsx";
-import useAllAgents from '../hooks/use-all-agents.tsx'
+import { useState, useRef, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Logo } from './Logo'
+import { MagnifyingGlassIcon, Cog6ToothIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline'
+import { mockUser } from '../mocks/user'
+import { mockAgents } from '../mocks/agent'
+import { User } from '../types/user'
+import { UsernameModal } from './UsernameModal'
+import { ThemeToggle } from './ThemeToggle'
 
 interface SidebarProps {
   onCollapse: (isCollapsed: boolean) => void
@@ -119,19 +119,15 @@ export function Sidebar({onCollapse, isCollapsed: propIsCollapsed}: SidebarProps
 
   return (
     <div
-      className={`fixed left-0 top-0 h-full dark:bg-gray-900 border-gray-200 dark:border-gray-800 transition-all duration-300 ease-in-out ${isCollapsed ? 'w-16' : 'w-64 bg-white'
-      }`}
+      className={`fixed left-0 top-16 h-[calc(100vh-4rem)] dark:bg-gray-900 border-gray-200 dark:border-gray-800 transition-all duration-300 ease-in-out z-50 ${isCollapsed ? 'w-16' : 'w-64 bg-white'
+        }`}
     >
       <div className="flex flex-col h-full">
-        {/* Logo */}
-        <div className="flex items-center justify-between px-4 py-2">
-          <div
-            className={`transition-all duration-300 ease-in-out ${isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'}`}>
-            <Logo/>
-          </div>
+        {/* Collapse Button */}
+        <div className="absolute right-0 top-[52px] transform translate-x-full">
           <button
             onClick={handleCollapse}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-0 focus:ring-offset-0 transition-colors duration-200"
+            className="p-2 bg-white dark:bg-gray-800 shadow-md hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-0 focus:ring-offset-0 transition-colors duration-200 rounded-r-lg border border-gray-200 dark:border-gray-700 -ml-[1px] text-gray-600 dark:text-gray-300"
           >
             <div className="relative w-5 h-5">
               <svg
@@ -139,11 +135,11 @@ export function Sidebar({onCollapse, isCollapsed: propIsCollapsed}: SidebarProps
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
+                strokeWidth={1.5}
               >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  strokeWidth={2}
                   d="M4 6h16M4 12h16M4 18h16"
                 />
               </svg>
@@ -152,11 +148,11 @@ export function Sidebar({onCollapse, isCollapsed: propIsCollapsed}: SidebarProps
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
+                strokeWidth={1.5}
               >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  strokeWidth={2}
                   d="M11 19l-7-7 7-7m8 14l-7-7 7-7"
                 />
               </svg>
@@ -174,25 +170,6 @@ export function Sidebar({onCollapse, isCollapsed: propIsCollapsed}: SidebarProps
               AI Studio
             </button>
           </div>
-          <div className="space-y-2 my-2">
-            <div className="flex justify-center space-x-4 text-xs">
-              <Link
-                to="/docs/intro"
-                className={`px-3 py-1 rounded-lg text-gray-600 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors ${isCollapsed ? 'justify-center' : ''}`}
-              >
-                {!isCollapsed && <span>Documentation</span>}
-              </Link>
-              <a
-                href="https://github.com/rooch-network/nuwa"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`px-3 py-1 rounded-lg text-gray-600 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors ${isCollapsed ? 'justify-center' : ''}`}
-              >
-                {!isCollapsed && <span>GitHub</span>}
-              </a>
-            </div>
-          </div>
-
         </div>
 
         {/* Main Content Area */}
@@ -247,7 +224,7 @@ export function Sidebar({onCollapse, isCollapsed: propIsCollapsed}: SidebarProps
           {/* User Profile */}
           <div className={`transition-all duration-300 ease-in-out ${isCollapsed ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100 h-auto'}`}>
             <div className="p-4">
-              {user ? (
+              {user && (
                 <div className="relative" ref={dropdownRef}>
                   <button
                     onClick={toggleDropdown}
@@ -289,9 +266,6 @@ export function Sidebar({onCollapse, isCollapsed: propIsCollapsed}: SidebarProps
                     </div>
                   )}
                 </div>
-              ) : (
-                <ConnectButton
-                  className="w-full border border-gray-200 dark:border-gray-800 rounded-lg px-4 py-2 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors focus:outline-none focus:ring-0 focus:ring-offset-0"/>
               )}
             </div>
           </div>
