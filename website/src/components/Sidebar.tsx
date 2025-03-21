@@ -244,10 +244,8 @@ export function Sidebar({onCollapse, isCollapsed: propIsCollapsed}: SidebarProps
 
         {/* Bottom Section */}
         <div className="mt-auto">
-
-          {/* Connect Wallet / User Profile */}
-          <div
-            className={`transition-all duration-300 ease-in-out ${isCollapsed ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100 h-auto'}`}>
+          {/* User Profile */}
+          <div className={`transition-all duration-300 ease-in-out ${isCollapsed ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100 h-auto'}`}>
             <div className="p-4">
               {user ? (
                 <div className="relative" ref={dropdownRef}>

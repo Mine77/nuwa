@@ -3,16 +3,17 @@ export function Hero() {
     <div className="relative min-h-[600px]">
       <div className="absolute inset-0 bg-gradient-to-b from-white via-white/95 to-[#FF15FB] dark:from-gray-900 dark:via-gray-900 dark:to-[#FF15FB] bg-[length:100%_200%] bg-[position:0%_30%]"></div>
       <div
-        className="absolute inset-0"
+        className="absolute inset-0 opacity-50"
         style={{
           backgroundImage: `url('/hero-background.png')`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
+          filter: 'grayscale(100%)',
         }}
       ></div>
       <div className="relative container mx-auto px-4 py-16 sm:py-24">
-        <div className="text-center">
+        <div className="text-center pt-[30px]">
           {/* Logo */}
           <div className="flex justify-center mb-8 sm:mb-12">
             <img
@@ -38,8 +39,10 @@ export function Hero() {
           </p>
 
           {/* Talk to Nuwa Button */}
-          <button className="px-8 py-3 text-lg font-semibold text-white bg-gradient-to-r from-purple-600 to-pink-600 rounded-full hover:opacity-90 transition-opacity">
-            Talk to Nuwa
+          <button className="group relative px-8 py-3 text-lg font-semibold rounded-full border-2 border-purple-600 hover:border-transparent transition-all duration-500 ease-in-out overflow-hidden bg-white dark:bg-gray-900">
+            <span className="relative z-10 text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600 group-hover:text-white transition-colors duration-500">Talk to Nuwa</span>
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-pink-600 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 ease-in-out origin-left"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-pink-600 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 ease-in-out origin-right delay-100"></div>
           </button>
         </div>
       </div>
